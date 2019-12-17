@@ -10,19 +10,20 @@ import torch.optim as optim
 from models.model import Actor, Critic
 from replay_buffers.per_nstep import PerNStep
 
-BUFFER_SIZE = int(2 ** 20)  # replay buffer size
+BUFFER_SIZE = 2**18  # replay buffer size
 BATCH_SIZE = 1024  # minibatch size
 N_STEP = 1
 UPDATE_EVERY = 20
 
 GAMMA = 0.99  # discount factor
 TAU = 1e-3  # for soft update of target parameters
-LR_ACTOR = 1e-3  # learning rate of the actor
-LR_CRITIC = 1e-3  # learning rate of the critic
+LR_ACTOR = 1e-4  # learning rate of the actor
+LR_CRITIC = 1e-4  # learning rate of the critic
 WEIGHT_DECAY = 0  # L2 weight decay
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+### NOTES:
+# N-step on normal RB
 
 class Agent():
     """Interacts with and learns from the environment."""
@@ -69,14 +70,15 @@ class Agent():
         """Save experience in replay memory, and use random sample from buffer to learn."""
         self.step_count += 1
         # Save experience / reward
-        for agent_idx, (state, action, reward, next_state, done) in enumerate(
-                zip(states, actions, rewards, next_states, dones)):
+        agent_idx = 0
+        for state, action, reward, next_state, done in zip(states, actions, rewards, next_states, dones):
             self.memory.add(agent_idx, state, action, reward, next_state, done)
+            agent_idx += 1
 
         # Learn, if enough samples are available in memory
-        if len(self.memory) > BATCH_SIZE:
-            if self.step_count % UPDATE_EVERY == 0:
-                self.step_count = 0
+        if self.step_count % UPDATE_EVERY == 0:
+            self.step_count = 0
+            if len(self.memory) > BATCH_SIZE:
                 for _ in range(self.train_num):
                     idxs, experiences, is_weights = self.memory.sample()
                     if self.per:

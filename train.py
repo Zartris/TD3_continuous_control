@@ -26,7 +26,7 @@ def train_agent(brain_name, agent: Agent, n_episodes=1000, max_t=1000, print_eve
             rewards = env_info.rewards  # get reward (for each agent)
             dones = env_info.local_done  # see if episode finished
             agent.step(states, actions, rewards, next_states, dones)
-            score += rewards  # update the score (for each agent)
+            score += env_info.rewards  # update the score (for each agent)
             states = next_states  # roll over states to next time step
             if np.any(dones):
                 break
@@ -37,12 +37,11 @@ def train_agent(brain_name, agent: Agent, n_episodes=1000, max_t=1000, print_eve
         writer.add_scalar('score_avg_over_100_episodes', avg_score, i_episode - 1)
         print('\rEpisode {}\tAverage Score: {:.2f} \t current: {:.3f}'.format(i_episode, avg_score, np.mean(score)),
               end="")
-
-        # torch.save(agent.actor_local.state_dict(), 'checkpoint_actor.pth')
-        # torch.save(agent.critic_local.state_dict(), 'checkpoint_critic.pth')
         if i_episode % print_every == 0:
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_deque)))
         if avg_score > 30:
+            torch.save(agent.actor_local.state_dict(), 'checkpoint_actor.pth')
+            torch.save(agent.critic_local.state_dict(), 'checkpoint_critic.pth')
             if avg_score > 30:
                 print('\nEnvironment solved in {:d} episodes!'.format(i_episode))
                 break
@@ -52,7 +51,7 @@ def train_agent(brain_name, agent: Agent, n_episodes=1000, max_t=1000, print_eve
 
 if __name__ == '__main__':
     seed = 0
-    gamefile = Path(os.getcwd(), 'Reacher', 'Reacher.x86_64')
+    gamefile = Path(os.getcwd(), 'Reacher', 'Reacher.exe')
     env = UnityEnvironment(file_name=str(gamefile), seed=seed)
     # get the default brain
     brain_name = env.brain_names[0]
@@ -78,7 +77,7 @@ if __name__ == '__main__':
 
     #### 3. Take Random Actions in the Environment
     scores = np.zeros(num_agents)  # initialize the score (for each agent)
-    agent = Agent(state_size, action_size, random_seed=0, train_num=10, per=True)
+    agent = Agent(state_size, action_size, random_seed=0, train_num=10, per=False)
     # Creating wrapper to handle multiple agents.
     # agent = MultiAgent(agents=agents, seed=seed, action_size=action_size, state_size=state_size)
     scores = train_agent(brain_name, agent)
