@@ -7,7 +7,8 @@ import torch
 class PerNStep:
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    def __init__(self, capacity, batch_size, state_size, seed=None, epsilon=.001, alpha=.6, beta=.4, beta_increase=1e-3,
+    def __init__(self, capacity, batch_size, state_size, seed=None, epsilon=.0001, alpha=.6, beta=.4,
+                 beta_increase=1e-3,
                  absolute_error_upper=3, n_step=3, gamma=.99):
         """
         :param capacity: Max amount of experience saved in the structure
@@ -46,7 +47,7 @@ class PerNStep:
         ## N-Step
         self.t = 0  # Internal time step counter
         self.n_step = n_step
-        self.n_step_buff = deque(maxlen=n_step)
+        self.n_step_buff = {}
         self.gamma = gamma
         self.blank_experience = self.experience(timestep=0,
                                                 state=torch.zeros(state_size, dtype=torch.float64),
@@ -125,13 +126,17 @@ class PerNStep:
         is_weights /= is_weights.max()
         return idxs, minibatch, is_weights
 
-    def add(self, state, action, reward, next_state, done, error=None):
+    def add(self, agent_idx, state, action, reward, next_state, done, error=None):
+        """Customized to more than one agent"""
         exp = self.experience(self.t, torch.from_numpy(state), action, reward, torch.from_numpy(next_state), done)
-        self.n_step_buff.append(exp)
-        self.t = (0 if done else self.t + 1)
-        if len(self.n_step_buff) < self.n_step:
+        if agent_idx not in self.n_step_buff:
+            self.n_step_buff[agent_idx] = deque(maxlen=self.n_step)
+        self.n_step_buff[agent_idx].append(exp)
+        if agent_idx == 0:
+            self.t = (0 if done else self.t + 1)
+        if len(self.n_step_buff[agent_idx]) < self.n_step:
             return None
-        exp, priority = self._get_n_step_info(self.n_step_buff, self.gamma)
+        exp, priority = self._get_n_step_info(self.n_step_buff[agent_idx], self.gamma)
         priority = min((abs(priority) + self.epsilon) ** self.alpha, self.absolute_error_upper)
         self.memory_tree.add(exp, priority)
 
@@ -192,6 +197,7 @@ class SumTree:
             self.data_length += 1
 
     def update(self, tree_index, priority):
+        # TODO: This is the time killer!
         # change = new priority score - former priority score
         change = priority - self.tree[tree_index]
         self.tree[tree_index] = priority
