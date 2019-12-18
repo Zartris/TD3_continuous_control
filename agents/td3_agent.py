@@ -12,16 +12,7 @@ from models.model import Actor, TwinCritic
 from replay_buffers.per_nstep import PerNStep
 from replay_buffers.replay_buffer import ReplayBuffer
 
-BUFFER_SIZE = 2 ** 18  # replay buffer size
-BATCH_SIZE = 1024  # minibatch size
-N_STEP = 1
-UPDATE_EVERY = 20
-
-GAMMA = 0.99  # discount factor
-TAU = 1e-3  # for soft update of target parameters
-LR_ACTOR = 1e-4  # learning rate of the actor
-LR_CRITIC = 1e-4  # learning rate of the critic
-WEIGHT_DECAY = 0  # L2 weight decay
+N_STEP = 3
 
 
 ### NOTES:
@@ -38,7 +29,14 @@ class TD3Agent():
                  action_val_low: float,  #
                  random_seed: int = 0,  #
                  train_delay: int = 2,  #
+                 buffer_size: int = 2 ** 20,
+                 batch_size: int = 256,
                  discount: float = 0.99,  # Discount factor
+                 tau: float = 1e-3,
+                 lr_actor: float = 1e-4,
+                 lr_critic: float = 1e-4,
+                 policy_noise: float = 0.2,
+                 noise_clip: float = 0.5,
                  per: bool = True,  #
                  model_dir: str = os.getcwd()  #
                  ):
@@ -61,22 +59,24 @@ class TD3Agent():
         # Actor Network (w/ Target Network)
         self.actor_local = Actor(state_size, action_size, seed=random_seed).to(self.device)
         self.actor_target = Actor(state_size, action_size, seed=random_seed).to(self.device)
-        self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=LR_ACTOR)
+        self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=self.lr_actor)
 
         # Using Twin Critic Network (w/ Target Network), we are combining the two critics into the same network
         self.twin_critic_local = TwinCritic(state_size, action_size, seed=random_seed).to(self.device)
         self.twin_critic_target = TwinCritic(state_size, action_size, seed=random_seed).to(self.device)
-        self.critic_optimizer = optim.Adam(self.twin_critic_local.parameters(), lr=LR_CRITIC, weight_decay=WEIGHT_DECAY)
+        self.critic_optimizer = optim.Adam(self.twin_critic_local.parameters(), lr=self.lr_critic, weight_decay=0)
 
         # Noise process
         self.noise = OUNoise(action_size, random_seed)
 
         # Combined replay buffer:
         self.per = per
+        self.batch_size = batch_size
+        self.buffer_size = buffer_size
         if per:
-            self.memory = PerNStep(BUFFER_SIZE, BATCH_SIZE, state_size, seed=random_seed, n_step=N_STEP)
+            self.memory = PerNStep(buffer_size, batch_size, state_size, seed=random_seed, n_step=N_STEP)
         else:
-            self.memory = ReplayBuffer(action_size, buffer_size=BUFFER_SIZE, batch_size=BATCH_SIZE, seed=random_seed)
+            self.memory = ReplayBuffer(action_size, buffer_size=buffer_size, batch_size=batch_size, seed=random_seed)
         # Learning count:
         self.step_count = 0
 
@@ -84,6 +84,11 @@ class TD3Agent():
         self.train_delay = train_delay
 
         self.discount = discount
+        self.tau = tau
+        self.lr_actor = lr_actor
+        self.lr_critic = lr_critic
+        self.policy_noise = policy_noise
+        self.noise_clip = noise_clip
 
     def step(self, states, actions, rewards, next_states, dones):
         """Save experience in replay memory, and use random sample from buffer to learn."""
@@ -93,10 +98,11 @@ class TD3Agent():
         for state, action, reward, next_state, done in zip(states, actions, rewards, next_states, dones):
             self.memory.add(agent_idx, state, action, reward, next_state, done)
             agent_idx += 1
+
         # Time to train.
         # We want to train the critics every step but delay the actor update for self.train_delay of time.
         # Learn, if enough samples are available in memory
-        if len(self.memory) > BATCH_SIZE:
+        if len(self.memory) > self.batch_size:
             self.learn()
 
     def act(self, states, add_noise=True):
@@ -128,34 +134,48 @@ class TD3Agent():
         # Get a batch of experiences:
         idxs, experiences, is_weights = self.memory.sample()  # take a batch to train the critics with
         states, actions, rewards, next_states, dones = experiences
-        # TODO: IM HERE!
         # ---------------------------- update critic ---------------------------- #
-        # Get predicted next-state actions and Q values from target models
-        actions_next = self.actor_target(next_states)
-        Q1_targets_next, Q2_targets_next = self.twin_critic_target(next_states, actions_next)
-        # Compute Q targets for current states (y_i)
-        Q_targets = rewards + (self.discount * Q1_targets_next * (1 - dones))
+        # Compute the Target Q (min of Q1 and Q2)
+        # TODO: Question, is this nessary? we are never using the gradient anyway. Sure for performance.
+        with torch.no_grad():
+            # performing policy smooth, by adding noise, to reduce variance.
+            noise = (torch.randn_like(actions) * self.policy_noise)
+            # clamping the noise to keep the target value close to original action
+            noise = noise.clamp(-self.noise_clip, self.noise_clip)
+            # using actor target to get next state and add noise
+            next_actions = (self.actor_target(next_states) + noise)
+            # claping to make sure they are within action value range
+            next_actions = next_actions.clamp(self.action_val_low, self.action_val_high)
+
+            # Compute the target Q value:
+            Q1_targets, Q2_targets = self.twin_critic_target(next_states, next_actions)
+            target_Q = torch.min(Q1_targets, Q2_targets)
+            target_Q = rewards + (self.discount * target_Q * (1 - dones))
+
         # Compute critic loss
-        Q1_expected, Q2_expected = self.twin_critic_local(states, actions)
-        critic_loss = F.mse_loss(Q1_expected, Q_targets)
+        expected_Q1, expected_Q2 = self.twin_critic_local(states, actions)  # let it compute gradient
+        critic_loss = F.mse_loss(expected_Q1, target_Q) + F.mse_loss(expected_Q2, target_Q)
+
         # Minimize the loss
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
         torch.nn.utils.clip_grad_norm_(self.twin_critic_local.parameters(), 1)
         self.critic_optimizer.step()
+        # Delayed training of actor network:
+        if self.step_count % self.train_delay == 0:
+            # ---------------------------- update actor ---------------------------- #
+            self.step_count = 0
+            # Compute actor loss
+            actions_pred = self.actor_local(states)
+            actor_loss = -self.twin_critic_local.Q1(states, actions_pred).mean()
+            # Minimize the loss
+            self.actor_optimizer.zero_grad()
+            actor_loss.backward()
+            self.actor_optimizer.step()
 
-        # ---------------------------- update actor ---------------------------- #
-        # Compute actor loss
-        actions_pred = self.actor_local(states)
-        actor_loss = -self.twin_critic_local(states, actions_pred).mean()
-        # Minimize the loss
-        self.actor_optimizer.zero_grad()
-        actor_loss.backward()
-        self.actor_optimizer.step()
-
-        # ----------------------- update target networks ----------------------- #
-        self.soft_update(self.twin_critic_local, self.twin_critic_target, TAU)
-        self.soft_update(self.actor_local, self.actor_target, TAU)
+            # ----------------------- update target networks ----------------------- #
+            self.soft_update(self.twin_critic_local, self.twin_critic_target, self.tau)
+            self.soft_update(self.actor_local, self.actor_target, self.tau)
 
     def soft_update(self, local_model, target_model, tau):
         """Soft update model parameters.
