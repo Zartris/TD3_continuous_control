@@ -104,17 +104,17 @@ if __name__ == '__main__':
     parser.add_argument("--episodes", default=1000, type=int)  # Number of episodes to train for
     parser.add_argument("--batch_size", default=512, type=int)  # Batch size for training
     parser.add_argument("--buffer_size", default=2 ** 20, type=int)  # Batch size for training
-    parser.add_argument("--discount", default=0.995)  # Discount factor
-    parser.add_argument("--tau", default=0.01)  # Soft update factor
-    parser.add_argument("--lr_actor", default=1e-3)  # Optimizer learning rate for the actor
-    parser.add_argument("--lr_critic", default=1e-3)  # Optimizer learning rate for the critic
+    parser.add_argument("--discount", default=0.99)  # Discount factor
+    parser.add_argument("--tau", default=0.001)  # Soft update factor
+    parser.add_argument("--lr_actor", default=5e-4)  # Optimizer learning rate for the actor
+    parser.add_argument("--lr_critic", default=5e-4)  # Optimizer learning rate for the critic
     parser.add_argument("--weight_decay", default=1e-6)  # Optimizer learning rate for the critic
     parser.add_argument("--policy_noise", default=0.2)  # Noise added to target policy during critic update
     parser.add_argument("--noise_clip", default=0.5)  # Range to clip target policy noise
     parser.add_argument("--exploration_noise", default=0.1)  # Std of Gaussian exploration noise
     parser.add_argument("--train_delay", default=2, type=int)  # Frequency of delayed policy updates
-    parser.add_argument("--steps_before_train", default=20, type=int)  # Steps taken between train calls.
-    parser.add_argument("--train_iterations", default=10, type=int)  # number of batches trained on per train call
+    parser.add_argument("--steps_before_train", default=1, type=int)  # Steps taken between train calls.
+    parser.add_argument("--train_iterations", default=1, type=int)  # number of batches trained on per train call
     parser.add_argument("--result_folder", default=os.path.join(os.getcwd(), "results"))
     parser.add_argument("--load_model_path", default="")  # If should load model: if "" don't load anything
     parser.add_argument("--eval", default=False, type=bool)  # If we only want to evaluate a model.

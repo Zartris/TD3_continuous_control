@@ -22,27 +22,27 @@ N_STEP = 3
 class TD3Agent():
     """Interacts with and learns from the environment."""
 
-    def __init__(self,
+    def __init__(self,  # These are just default parameters, check results\solved\model_test for used hyper-parameters
                  state_size: int,  #
                  action_size: int,  #
                  action_val_high: float,  #
                  action_val_low: float,  #
                  random_seed: int = 0,  #
                  train_delay: int = 2,  #
-                 steps_before_train=20,
-                 train_iterations=10,
+                 steps_before_train=1,  # Number of steps between training seasons, set to 1 if train after each step
+                 train_iterations=1,    # Number of batches train each training season
                  buffer_size: int = 2 ** 20,
-                 batch_size: int = 256,
+                 batch_size: int = 512,
                  discount: float = 0.99,  # Discount factor
                  tau: float = 1e-3,
-                 lr_actor: float = 1e-4,
-                 lr_critic: float = 1e-4,
-                 weight_decay: float = 0,
+                 lr_actor: float = 4e-4,
+                 lr_critic: float = 4e-4,
+                 weight_decay: float = 1e-6,
                  policy_noise: float = 0.2,
                  noise_clip: float = 0.5,
                  exploration_noise: float = 0.1,
-                 per: bool = True,  #
-                 model_dir: str = os.getcwd()  #
+                 per: bool = False,  # Not implemented yet, but will come.
+                 model_dir: str = os.getcwd()  # Save\load model dir
                  ):
         """Initialize an Agent object.
 
@@ -60,15 +60,25 @@ class TD3Agent():
         self.model_dir = model_dir
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+        # Should have been parameters, but now they are here.
+        fc1_units = 400
+        fc2_units = 300
+
         # Actor Network (w/ Target Network)
-        self.actor_local = Actor(state_size, action_size, seed=random_seed).to(self.device)
-        self.actor_target = Actor(state_size, action_size, seed=random_seed).to(self.device)
-        self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=lr_actor,
-                                          weight_decay=weight_decay)  # TODO: Test if wdcay helps learning else lower lr
+        self.actor_local = Actor(state_size, action_size, seed=random_seed, fc1_units=fc1_units,
+                                 fc2_units=fc2_units).to(
+            self.device)
+        self.actor_target = Actor(state_size, action_size, seed=random_seed, fc1_units=fc1_units,
+                                  fc2_units=fc2_units).to(
+            self.device)
+        self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=lr_actor)
 
         # Using Twin Critic Network (w/ Target Network), we are combining the two critics into the same network
-        self.twin_critic_local = TwinCritic(state_size, action_size, seed=random_seed).to(self.device)
-        self.twin_critic_target = TwinCritic(state_size, action_size, seed=random_seed).to(self.device)
+        self.twin_critic_local = TwinCritic(state_size, action_size, seed=random_seed, fc1_units=fc1_units,
+                                            fc2_units=fc2_units).to(
+            self.device)
+        self.twin_critic_target = TwinCritic(state_size, action_size, seed=random_seed, fc1_units=fc1_units,
+                                             fc2_units=fc2_units).to(self.device)
         self.critic_optimizer = optim.Adam(self.twin_critic_local.parameters(), lr=lr_critic,
                                            weight_decay=weight_decay)  # TODO: Test if wdcay helps learning else lower lr
 
@@ -184,6 +194,7 @@ class TD3Agent():
             actor_loss = -self.twin_critic_local.Q1(states, actions_pred).mean()  # Minus is for maximizing
             # Minimize the loss
             self.actor_optimizer.zero_grad()
+            torch.nn.utils.clip_grad_norm_(self.actor_local.parameters(), 1)
             actor_loss.backward()
             self.actor_optimizer.step()
 
