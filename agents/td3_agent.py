@@ -29,14 +29,18 @@ class TD3Agent():
                  action_val_low: float,  #
                  random_seed: int = 0,  #
                  train_delay: int = 2,  #
+                 steps_before_train=20,
+                 train_iterations=10,
                  buffer_size: int = 2 ** 20,
                  batch_size: int = 256,
                  discount: float = 0.99,  # Discount factor
                  tau: float = 1e-3,
                  lr_actor: float = 1e-4,
                  lr_critic: float = 1e-4,
+                 weight_decay: float = 0,
                  policy_noise: float = 0.2,
                  noise_clip: float = 0.5,
+                 exploration_noise: float = 0.1,
                  per: bool = True,  #
                  model_dir: str = os.getcwd()  #
                  ):
@@ -59,12 +63,14 @@ class TD3Agent():
         # Actor Network (w/ Target Network)
         self.actor_local = Actor(state_size, action_size, seed=random_seed).to(self.device)
         self.actor_target = Actor(state_size, action_size, seed=random_seed).to(self.device)
-        self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=self.lr_actor)
+        self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=lr_actor,
+                                          weight_decay=weight_decay)  # TODO: Test if wdcay helps learning else lower lr
 
         # Using Twin Critic Network (w/ Target Network), we are combining the two critics into the same network
         self.twin_critic_local = TwinCritic(state_size, action_size, seed=random_seed).to(self.device)
         self.twin_critic_target = TwinCritic(state_size, action_size, seed=random_seed).to(self.device)
-        self.critic_optimizer = optim.Adam(self.twin_critic_local.parameters(), lr=self.lr_critic, weight_decay=0)
+        self.critic_optimizer = optim.Adam(self.twin_critic_local.parameters(), lr=lr_critic,
+                                           weight_decay=weight_decay)  # TODO: Test if wdcay helps learning else lower lr
 
         # Noise process
         self.noise = OUNoise(action_size, random_seed)
@@ -79,20 +85,23 @@ class TD3Agent():
             self.memory = ReplayBuffer(action_size, buffer_size=buffer_size, batch_size=batch_size, seed=random_seed)
         # Learning count:
         self.step_count = 0
+        self.train_count = 0
 
         # Amount of training rounds:
         self.train_delay = train_delay
-
+        self.steps_before_train = steps_before_train
+        self.train_iterations = train_iterations
         self.discount = discount
         self.tau = tau
         self.lr_actor = lr_actor
         self.lr_critic = lr_critic
         self.policy_noise = policy_noise
         self.noise_clip = noise_clip
+        self.exploration_noise = exploration_noise
 
     def step(self, states, actions, rewards, next_states, dones):
         """Save experience in replay memory, and use random sample from buffer to learn."""
-
+        self.step_count += 1
         # Save experience / reward
         agent_idx = 0  # This is needed if we are ever to use N-step but currently just here for nothing
         for state, action, reward, next_state, done in zip(states, actions, rewards, next_states, dones):
@@ -102,8 +111,12 @@ class TD3Agent():
         # Time to train.
         # We want to train the critics every step but delay the actor update for self.train_delay of time.
         # Learn, if enough samples are available in memory
-        if len(self.memory) > self.batch_size:
-            self.learn()
+
+        if self.step_count % self.steps_before_train == 0:
+            self.step_count = 0
+            if len(self.memory) > self.batch_size:
+                for _ in range(self.train_iterations):
+                    self.learn()
 
     def act(self, states, add_noise=True):
         """Returns actions for given state as per current policy."""
@@ -113,7 +126,8 @@ class TD3Agent():
             actions = self.actor_local(states).cpu().data.numpy()
         self.actor_local.train()
         if add_noise:
-            actions += self.noise.sample()
+            # OBSERVATION: Use gaussian noise instead of OUNoise, this improve performance a lot!
+            actions += np.random.normal(0, self.action_val_high * self.exploration_noise, self.action_size)
         return np.clip(actions, self.action_val_low, self.action_val_high)
 
     def reset(self):
@@ -130,7 +144,7 @@ class TD3Agent():
                     experiences (Tuple[torch.Tensor]): tuple of (s, a, r, s', done) tuples
                     gamma (float): discount factor
                 """
-        self.step_count += 1
+        self.train_count += 1
         # Get a batch of experiences:
         idxs, experiences, is_weights = self.memory.sample()  # take a batch to train the critics with
         states, actions, rewards, next_states, dones = experiences
@@ -162,12 +176,12 @@ class TD3Agent():
         torch.nn.utils.clip_grad_norm_(self.twin_critic_local.parameters(), 1)
         self.critic_optimizer.step()
         # Delayed training of actor network:
-        if self.step_count % self.train_delay == 0:
+        if self.train_count % self.train_delay == 0:
             # ---------------------------- update actor ---------------------------- #
-            self.step_count = 0
+            self.train_count = 0
             # Compute actor loss
             actions_pred = self.actor_local(states)
-            actor_loss = -self.twin_critic_local.Q1(states, actions_pred).mean()
+            actor_loss = -self.twin_critic_local.Q1(states, actions_pred).mean()  # Minus is for maximizing
             # Minimize the loss
             self.actor_optimizer.zero_grad()
             actor_loss.backward()

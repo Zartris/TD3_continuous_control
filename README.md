@@ -62,10 +62,18 @@ The environment is considered solved, when the average (over 100 episodes) of th
 
 2. Place the file in the DRLND GitHub repository, in the `p2_continuous-control/` folder, and unzip (or decompress) the file. 
 
-### Instructions
+### Improvement
+The following list is more of notes to myself. It contains further improvement i want to implement and test out:
+* N-step
+* Priority experience replay (Replay buffer)
+    * Look at the priority function in this paper https://arxiv.org/pdf/1707.08817.pdf
+* Improved Critic with better model (maybe fit own [rainbow implementation](https://github.com/Zartris/rainbow_navigation_project))
+* ~~Profiling the script to improve running speed.~~
+* Auto generate logs for each train_run.
+* Optimize hyper-parameters
 
-Follow the instructions in `Continuous_Control.ipynb` to get started with training your own agent!  
-
+These are not in order, but from experience, leave optimizing hyper-parameters to after modification. 
+Reason is, the parameters vary a lot depending on the modifications. 
 ### (Optional) Challenge: Crawler Environment
 
 After you have successfully completed the project, you might like to solve the more difficult **Crawler** environment.
