@@ -79,8 +79,8 @@ The following list is more of notes to myself. It contains further improvement i
     * Look at the priority function in this paper https://arxiv.org/pdf/1707.08817.pdf
 * Improved Critic with better model (maybe fit own [rainbow implementation](https://github.com/Zartris/rainbow_navigation_project))
 * ~~Profiling the script to improve running speed.~~
-* Auto generate logs for each train_run.
-* Optimize hyper-parameters
+* ~~Auto generate logs for each train_run.~~
+* ~~Optimize hyper-parameters~~
 
 These are not in order, but from experience, leave optimizing hyper-parameters to after modification. 
 Reason is, the parameters vary a lot depending on the modifications. 
