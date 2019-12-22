@@ -20,6 +20,7 @@ def eval_agent(brain_name, agent: TD3Agent, n_episodes=1000, max_t=1000, print_e
         states = env_info.vector_observations  # get the current state (for each agent)
         agent.reset()  # Reset all agents
         score = np.zeros(num_agents)
+        start_time = time.time()
         for t in range(max_t):
             actions = agent.act(states, add_noise=False)  # select an action (for each agent)
             env_info = env.step(actions)[brain_name]  # send all actions to tne environment
@@ -29,10 +30,20 @@ def eval_agent(brain_name, agent: TD3Agent, n_episodes=1000, max_t=1000, print_e
             states = next_states  # roll over states to next time step
             if np.any(dones):
                 break
-        scores_deque.append(np.mean(score))
-        scores.append(np.mean(score))
+        duration = time.time() - start_time
+        mean_score = np.mean(score)
+        min_score = min(score)
+        max_score = max(score)
+        scores_deque.append(mean_score)
+        scores.append(mean_score)
         avg_score = np.mean(scores_deque)
-        print('\rEpisode {}\tAverage Score: {:.2f} \t current: {:.3f}'.format(i_episode, avg_score, np.mean(score)),
+        log_str = ('Episode {}'
+                   '\tAverage Score: {:.2f} '
+                   '\t current mean: {:.2f}'
+                   '\t Min:{:.2f}'
+                   '\tMax:{:.2f}'
+                   '\tDuration:{:.2f}').format(i_episode, avg_score, mean_score, min_score, max_score, duration)
+        print("\r" + log_str,
               end="")
         if i_episode % print_every == 0:
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, np.mean(scores_deque)))
@@ -118,6 +129,7 @@ if __name__ == '__main__':
     parser.add_argument("--result_folder", default=os.path.join(os.getcwd(), "results"))
     parser.add_argument("--load_model_path", default="")  # If should load model: if "" don't load anything
     parser.add_argument("--eval", default=False, type=bool)  # If we only want to evaluate a model.
+    parser.add_argument("--eval_load_best", default=False, type=bool)  # load best model (used by reviewers)
     parser.add_argument("--slow_and_pretty", default=False, type=bool)  # If we only want to evaluate a model.
 
     args = parser.parse_args()
@@ -166,6 +178,11 @@ if __name__ == '__main__':
     print('The state for the first agent looks like:', states[0])
 
     #### 3. Take Random Actions in the Environment
+    model_dir = args.load_model_path if args.load_model_path != "" else str(save_model_path)
+    eval = args.eval
+    if args.eval_load_best:
+        model_dir = Path(os.getcwd(), "results","solved")
+        eval = True
     scores = np.zeros(num_agents)  # initialize the score (for each agent)
     agent = TD3Agent(state_size,
                      action_size,
@@ -186,11 +203,11 @@ if __name__ == '__main__':
                      noise_clip=args.noise_clip,
                      exploration_noise=args.exploration_noise,
                      per=False,  # Not implemented yet
-                     model_dir=args.load_model_path if args.load_model_path != "" else str(save_model_path)
+                     model_dir=model_dir
                      )
     # Creating wrapper to handle multiple agents.
     # agent = MultiAgent(agents=agents, seed=seed, action_size=action_size, state_size=state_size)
-    if not args.eval:
+    if not eval:
         if args.load_model_path != "":
             agent.load()
         scores = train_agent(brain_name=brain_name,
