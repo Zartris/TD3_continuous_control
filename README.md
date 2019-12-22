@@ -61,8 +61,16 @@ The environment is considered solved, when the average (over 100 episodes) of th
 
     (_For AWS_) If you'd like to train the agent on AWS (and have not [enabled a virtual screen](https://github.com/Unity-Technologies/ml-agents/blob/master/docs/Training-on-Amazon-Web-Service.md)), then please use [this link](https://s3-us-west-1.amazonaws.com/udacity-drlnd/P2/Reacher/one_agent/Reacher_Linux_NoVis.zip) (version 1) or [this link](https://s3-us-west-1.amazonaws.com/udacity-drlnd/P2/Reacher/Reacher_Linux_NoVis.zip) (version 2) to obtain the "headless" version of the environment.  You will **not** be able to watch the agent without enabling a virtual screen, but you will be able to train the agent.  (_To watch the agent, you should follow the instructions to [enable a virtual screen](https://github.com/Unity-Technologies/ml-agents/blob/master/docs/Training-on-Amazon-Web-Service.md), and then download the environment for the **Linux** operating system above._)
 
-2. Place the file in the DRLND GitHub repository, in the `p2_continuous-control/` folder, and unzip (or decompress) the file. 
+2. Place the file in the DRLND GitHub repository, in the `TD3_continuous_control/` folder, and unzip (or decompress) the file. 
+3. Rename the file to Reacher
+4. Install environment
 
+    1. pip install matplotlib
+    2. pip install mlagents
+    3. pip install numpy
+    4. pip install tensorboardx
+    5. pip install tensorboard
+5. In the `TD3_continuous_control/` folder run command: `python train.py --eval_load_best=True` or `python train.py --eval_load_best=True --slow_and_pretty=True` for a slow representation
 ### Definition of solved:
 As an example, consider the plot below, where we have plotted the average score (over all 20 agents) obtained with each episode.
 
@@ -84,23 +92,9 @@ The following list is more of notes to myself. It contains further improvement i
 
 These are not in order, but from experience, leave optimizing hyper-parameters to after modification. 
 Reason is, the parameters vary a lot depending on the modifications. 
-### (Optional) Challenge: Crawler Environment
 
-After you have successfully completed the project, you might like to solve the more difficult **Crawler** environment.
-
-![Crawler][image2]
-
-In this continuous control environment, the goal is to teach a creature with four legs to walk forward without falling.  
-
-You can read more about this environment in the ML-Agents GitHub [here](https://github.com/Unity-Technologies/ml-agents/blob/master/docs/Learning-Environment-Examples.md#crawler).  To solve this harder task, you'll need to download a new Unity environment.  (**Note**: Udacity students should not submit a project with this new environment.)
-
-You need only select the environment that matches your operating system:
-- Linux: [click here](https://s3-us-west-1.amazonaws.com/udacity-drlnd/P2/Crawler/Crawler_Linux.zip)
-- Mac OSX: [click here](https://s3-us-west-1.amazonaws.com/udacity-drlnd/P2/Crawler/Crawler.app.zip)
-- Windows (32-bit): [click here](https://s3-us-west-1.amazonaws.com/udacity-drlnd/P2/Crawler/Crawler_Windows_x86.zip)
-- Windows (64-bit): [click here](https://s3-us-west-1.amazonaws.com/udacity-drlnd/P2/Crawler/Crawler_Windows_x86_64.zip)
-
-Then, place the file in the `p2_continuous-control/` folder in the DRLND GitHub repository, and unzip (or decompress) the file.  Next, open `Crawler.ipynb` and follow the instructions to learn how to use the Python API to control the agent.
-
-(_For AWS_) If you'd like to train the agent on AWS (and have not [enabled a virtual screen](https://github.com/Unity-Technologies/ml-agents/blob/master/docs/Training-on-Amazon-Web-Service.md)), then please use [this link](https://s3-us-west-1.amazonaws.com/udacity-drlnd/P2/Crawler/Crawler_Linux_NoVis.zip) to obtain the "headless" version of the environment.  You will **not** be able to watch the agent without enabling a virtual screen, but you will be able to train the agent.  (_To watch the agent, you should follow the instructions to [enable a virtual screen](https://github.com/Unity-Technologies/ml-agents/blob/master/docs/Training-on-Amazon-Web-Service.md), and then download the environment for the **Linux** operating system above._)
-
+### Thanks to the following sites:
+Through this project I have found the information on the following sites to be a very big help in form of easy explaination and simple follow through of the TD3 algorithm, a big thanks for all the good explaination they have given us for free:
+1. https://towardsdatascience.com/td3-learning-to-run-with-ai-40dfc512f93
+2. https://spinningup.openai.com/en/latest/algorithms/td3.html#background
+3. https://arxiv.org/pdf/1802.09477.pdf
