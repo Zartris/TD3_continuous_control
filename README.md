@@ -93,4 +93,8 @@ The following list is more of notes to myself. It contains further improvement i
 These are not in order, but from experience, leave optimizing hyper-parameters to after modification. 
 Reason is, the parameters vary a lot depending on the modifications. 
 
-### Setup
+### Thanks to the following sites:
+Through this project I have found the information on the following sites to be a very big help in form of easy explaination and simple follow through of the TD3 algorithm, a big thanks for all the good explaination they have given us for free:
+1. https://towardsdatascience.com/td3-learning-to-run-with-ai-40dfc512f93
+2. https://spinningup.openai.com/en/latest/algorithms/td3.html#background
+3. https://arxiv.org/pdf/1802.09477.pdf
